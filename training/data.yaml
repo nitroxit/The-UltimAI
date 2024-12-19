@@ -1,0 +1,6 @@
+path: ../ModelTraining
+train: ./train/images
+val: ./valid/images
+
+nc: 2
+names: ['player1', 'player2']
