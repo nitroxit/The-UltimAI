@@ -1,6 +1,6 @@
-path: ../ModelTraining
+path: ../training
 train: ./train/images
 val: ./valid/images
 
-nc: 2
-names: ['player1', 'player2']
+nc: 3
+names: ['player1', 'player2', 'player3']

@@ -13,12 +13,12 @@ class TrainPage(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
-        self.preferred_geometry = "900x980"
+        self.preferred_geometry = "900x800"
 
         ctk.CTkLabel(self, text="Train Page", font=("Arial", 16)).pack(pady=20)
 
         self.folder_path = None
-        self.yaml_file_path = Path(__file__).parent / "training/data.yaml"  # Points to ./images/data.yaml
+        self.yaml_file_path = Path(__file__).parent / "../training/data.yaml"  # Points to ./images/data.yaml
         self.yaml_data = None
         self.slider_value = ctk.DoubleVar(value=80)  # Default to 80%
 
@@ -59,7 +59,7 @@ class TrainPage(ctk.CTkFrame):
 
         # Prepare training and validation folders
         script_dir = Path(__file__).parent
-        training_dir = script_dir / "training"
+        training_dir = script_dir / "../training"
         if training_dir.exists():
             shutil.rmtree(training_dir)
         training_dir.mkdir(parents=True)
@@ -139,12 +139,6 @@ class TrainPage(ctk.CTkFrame):
         ctk.CTkButton(button_frame, text="Save Changes", command=self.save_yaml).pack(side="left", padx=10)
         ctk.CTkButton(button_frame, text="Train Model", command=self.start_training_thread).pack(side="left", padx=10)
 
-        # Add output box
-        self.output_box = Text(container, height=15, width=80, state="normal", wrap="word")
-        self.output_box.pack(pady=10)
-        self.output_box.insert(END, "Training output will be displayed here...\n")
-        self.output_box.config(state="disabled")  # Make it read-only
-
     def start_training_thread(self):
         """
         Starts the training command in a separate thread to prevent freezing.
@@ -154,7 +148,8 @@ class TrainPage(ctk.CTkFrame):
 
     def run_training_command(self):
         """
-        Runs the YOLO training command based on the user input and displays output in the box in real-time.
+        Runs the YOLO training command in a command prompt and pauses when done.
+        Ensures the runs folder and YOLO models are correctly placed in the `training` directory.
         """
         # Get the user input from the editor fields
         epochs = int(self.epochs_entry.get())
@@ -163,71 +158,26 @@ class TrainPage(ctk.CTkFrame):
         # Ensure the data.yaml path is correct
         data_path = os.path.abspath(self.yaml_file_path)
 
-        # Specify the runs folder location
-        script_dir = os.path.abspath(os.path.dirname(__file__))
-        runs_dir = os.path.join(script_dir, "training")
+        # Set the training directory as the working directory
+        training_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../training"))
+
+        # Ensure `runs` is the desired directory name for the outputs
+        runs_dir = os.path.join(training_dir, "runs")
 
         # Construct the YOLO training command
         command = (
             f"yolo task=detect mode=train model={model_name} data=\"{data_path}\" "
-            f"epochs={epochs} imgsz=640 plots=True project=\"{runs_dir}\""
+            f"epochs={epochs} imgsz=640 plots=True project=\"{runs_dir}\" name=run"
         )
 
         try:
-            # Open a subprocess to execute the command
-            process = subprocess.Popen(
-                command,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                encoding="utf-8",  # Set encoding to utf-8
-                errors="replace",  # Replace problematic characters
-            )
+            # Change the working directory to the training folder and execute the command
+            full_command = f"cmd /k \"cd /d {training_dir} && {command} && pause\""
 
-            # Enable the output box and clear previous output
-            self.output_box.config(state="normal")
-            self.output_box.delete(1.0, END)
-
-            # Buffer to hold the current line being updated
-            current_line = ""
-
-            while True:
-                # Read one character at a time
-                char = process.stdout.read(1)
-                if not char and process.poll() is not None:
-                    break  # Exit loop when process ends and no more output
-
-                if char == "\r":
-                    # Carriage return: Clear current line in the text box and prepare for update
-                    self.output_box.delete("end-1c linestart", "end-1c")
-                    self.output_box.insert("end-1c", current_line)
-                    self.output_box.see(END)  # Auto-scroll to the end
-                    current_line = ""  # Reset buffer for the next update
-                elif char == "\n":
-                    # Newline: Finalize the current line and start a new one
-                    self.output_box.insert(END, current_line + "\n")
-                    self.output_box.see(END)  # Auto-scroll to the end
-                    current_line = ""  # Reset buffer for the next line
-                else:
-                    # Accumulate characters into the current line
-                    current_line += char
-
-            # Wait for process to complete
-            process.wait()
-
-            if process.returncode == 0:
-                self.output_box.insert(END, "\nTraining completed successfully!\n")
-            else:
-                # Capture error output from stderr
-                error_output = process.stderr.read()
-                self.output_box.insert(END, f"\nAn error occurred during training:\n{error_output}\n")
-
-            self.output_box.config(state="disabled")  # Make it read-only again
-
+            # Run the command in a new command prompt window
+            os.system(full_command)
         except Exception as e:
-            self.output_box.config(state="normal")
-            self.output_box.insert(END, f"\nAn error occurred while starting training:\n{e}\n")
-            self.output_box.config(state="disabled")
+            messagebox.showerror("Error", f"An error occurred while starting training:\n{e}")
 
     def create_yaml_entry(self, parent, label_text, default_value):
         # Create an individual field within the container
